@@ -1,0 +1,24 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: NodeTool@0
+  inputs:
+    versionSpec: '18.x'
+  displayName: 'Install Node.js'
+
+- script: |
+    cd edusyncfrontend
+    npm install
+    npm run build
+  displayName: 'Build React App'
+
+- task: AzureWebApp@1
+  inputs:
+    azureSubscription: 'MyAzureConnection'   # ✅ Replace this in DevOps
+    appType: 'webAppLinux'
+    appName: 'edusync-frontend'                            # ✅ Your Azure frontend App Service name
+    package: 'edusyncfrontend/build'
