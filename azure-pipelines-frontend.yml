@@ -16,9 +16,11 @@ steps:
     npm run build
   displayName: 'Build React App'
 
-- task: AzureWebApp@1
+- task: AzureStaticWebApp@0
   inputs:
-    azureSubscription: 'MyAzureConnection'   # ✅ Replace this in DevOps
-    appType: 'webAppLinux'
-    appName: 'edusync-frontend-brijesh'                            # ✅ Your Azure frontend App Service name
-    package: 'edusyncfrontend/build'
+    app_location: 'edusyncfrontend'                      # Where your React source code is
+    output_location: 'build'                             # React build output
+    azure_static_web_apps_api_token: $(deployment_token) # ✅ Define this secret in DevOps
+    sku: 'Free'
+    is_static_export: true
+  displayName: 'Deploy to Azure Static Web App'
