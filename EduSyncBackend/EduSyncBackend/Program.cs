@@ -3,8 +3,6 @@ using Azure.Storage.Blobs;
 using EduSyncBackend.Data;
 using EduSyncBackend.Middleware;
 using EduSyncBackend.Services;
-
-//using EduSyncBackend.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -14,18 +12,18 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
-// It ensures appsettings.json and environment-specific config are loaded
+
+// Load configuration
 builder.Configuration
     .SetBasePath(Directory.GetCurrentDirectory())
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables();
 
-
-// Add DbContext with SQL Server
+// Add DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Add controllers with JSON options to ignore cycles (important to fix serialization issues)
+// Add Controllers
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -33,40 +31,25 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
     });
 
-// Add Swagger services
-builder.Services.AddEndpointsApiExplorer();
-
-// This line loads config from appsettings.json by default
-//builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
-
-builder.Services.AddControllers();
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-
+// Register AutoMapper
+builder.Services.AddAutoMapper(typeof(Program));
 
 // Add HttpClient
 builder.Services.AddHttpClient();
 
-// Configure CORS policies
+// ✅ FIXED CORS for local and deployed frontend
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("https://edusync-frontend-brijesh-f7byhagudcgpdfh6.eastus2-01.azurewebsites.net/")
-              .AllowAnyHeader()
-              .AllowAnyMethod();
-    });
-
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        policy.WithOrigins(
+            "http://localhost:3000",
+            "https://red-meadow-0ab5a720f.6.azurestaticapps.net"
+        )
+        .AllowAnyHeader()
+        .AllowAnyMethod();
     });
 });
-
-
 
 // Configure JWT authentication
 var jwtKey = builder.Configuration["Jwt:Key"];
@@ -87,16 +70,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-
-
-
-
-//builder.Services.AddSingleton<IEventHubService, EventHubService>();
-
-builder.Services.AddSingleton(x =>
-    new BlobServiceClient(builder.Configuration["AzureBlob:ConnectionString"]));
-
-
+// Register Blob Storage
 builder.Services.AddSingleton(x =>
 {
     var config = x.GetRequiredService<IConfiguration>();
@@ -104,35 +78,20 @@ builder.Services.AddSingleton(x =>
     return new BlobServiceClient(connectionString);
 });
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-
+// Register EventHub
 builder.Services.AddSingleton<IEventHubService, EventHubService>();
-
-
-
-
-// Register EventHubProducerClient singleton
 builder.Services.AddSingleton(x =>
     new EventHubProducerClient(
         builder.Configuration["EventHub:ConnectionString"],
         builder.Configuration["EventHub:HubName"]
     ));
 
-
-builder.Services.AddControllers();
-
-
-
-// Register AutoMapper
-builder.Services.AddAutoMapper(typeof(Program));
-
+// Add Swagger
+builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Your API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "EduSync API", Version = "v1" });
 
-    // Add JWT Authentication option
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -140,7 +99,7 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "Bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Enter 'Bearer' [space] and then your valid token.\n\nExample: \"Bearer eyJhbGciOiJIUzI1NiIs...\""
+        Description = "Enter 'Bearer' followed by your token.\n\nExample: Bearer eyJhbGciOiJIUzI1..."
     });
 
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -159,34 +118,30 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-
 var app = builder.Build();
 
-// Use custom error handling middleware once
+// Middleware pipeline
 app.UseMiddleware<ErrorHandlerMiddleware>();
 
-// Use CORS - make sure order is correct and only use one
+// ✅ Use correct CORS policy
 app.UseCors("AllowFrontend");
 
-// Swagger only in Development environment
-
+// Swagger
 app.UseSwagger();
-//  app.UseDeveloperExceptionPage();
-
 app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "EduSync API V1");
 });
 
-// Use HTTPS redirection, authentication, authorization, and routing
+// HTTPS & Developer Exception Page
 app.UseHttpsRedirection();
-app.UseCors();
-app.UseDeveloperExceptionPage(); // For development
+app.UseDeveloperExceptionPage();
 
-
+// Auth
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Routes
 app.MapControllers();
 
 app.Run();
