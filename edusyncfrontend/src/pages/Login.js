@@ -12,28 +12,30 @@ const Login = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
- const handleLogin = async (e) => {
-  e.preventDefault();
-  setLoading(true);
-  setError(null);
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
 
-  try {
-    const loggedInUser = await login(email, password); // returns userWithRole
-    console.log(loggedInUser?.role);
-    if (loggedInUser?.role === 'Student') {
-
-      navigate('/student-dashboard');
-    } else if (loggedInUser?.role === 'Instructor') {
-
-      navigate('/instructor-dashboard');
-    } 
-  } catch (err) {
-    setError(err.message || 'Login failed');
-  } finally {
-    setLoading(false);
-  }
-};
-
+    try {
+      const loggedInUser = await login(email, password); // returns userWithRole
+      console.log(loggedInUser?.role);
+      if (loggedInUser?.role === 'Student') {
+        navigate('/student-dashboard');
+      } else if (loggedInUser?.role === 'Instructor') {
+        navigate('/instructor-dashboard');
+      }
+    } catch (err) {
+      const msg = err.message?.toLowerCase();
+      if (msg?.includes('invalid credentials') || msg?.includes('unauthorized')) {
+        setError('User not found. Please register first.');
+      } else {
+        setError(err.message || 'Login failed');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="auth-container">
